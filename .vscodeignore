@@ -1,0 +1,12 @@
+.vscode/**
+.github/**
+.gitignore
+README 2.md
+CONTRIBUTING.md
+SECURITY.md
+docs/**
+test/**
+src/**
+dist/**/*.map
+tsconfig.json
+*.vsix

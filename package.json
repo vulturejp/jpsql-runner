@@ -1,0 +1,166 @@
+{
+  "name": "jpsql-runner",
+  "displayName": "JPSQL Runner",
+  "description": "Compile J-parameter SQL files and pass the generated SQL to your preferred VS Code SQL extension.",
+  "version": "0.0.1",
+  "publisher": "vulturejp",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vulturejp/jpsql-runner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vulturejp/jpsql-runner/issues"
+  },
+  "homepage": "https://github.com/vulturejp/jpsql-runner#readme",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "sql",
+    "report",
+    "parameters",
+    "database",
+    "jpsql"
+  ],
+  "activationEvents": [
+    "onView:jpsql.parametersView",
+    "onCommand:jpsql.runQuery",
+    "onCommand:jpsql.previewQuery",
+    "onCommand:jpsql.configureParameters",
+    "onCommand:jpsql.refreshParameters"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "jpsql",
+          "title": "JPSQL",
+          "icon": "media/jpsql.svg"
+        }
+      ]
+    },
+    "views": {
+      "jpsql": [
+        {
+          "id": "jpsql.parametersView",
+          "name": "Parameters",
+          "type": "webview"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "jpsql",
+        "extensions": [
+          ".jpsql"
+        ],
+        "aliases": [
+          "J Parameter SQL",
+          "JPSQL"
+        ],
+        "configuration": "./syntaxes/jpsql.configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "jpsql.runQuery",
+        "title": "JPSQL: Compile and Run",
+        "icon": "$(play)"
+      },
+      {
+        "command": "jpsql.previewQuery",
+        "title": "JPSQL: Preview Compiled Query",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "jpsql.configureParameters",
+        "title": "JPSQL: Show Parameters",
+        "icon": "$(settings)"
+      },
+      {
+        "command": "jpsql.refreshParameters",
+        "title": "JPSQL: Refresh Parameters",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "jpsql.previewQuery",
+          "group": "navigation@9",
+          "when": "resourceExtname == .jpsql || resourceExtname == .jrxml"
+        },
+        {
+          "command": "jpsql.runQuery",
+          "group": "navigation@10",
+          "when": "resourceExtname == .jpsql || resourceExtname == .jrxml"
+        },
+        {
+          "command": "jpsql.configureParameters",
+          "group": "navigation@11",
+          "when": "resourceExtname == .jpsql || resourceExtname == .jrxml"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "jpsql.previewQuery",
+          "group": "navigation",
+          "when": "resourceExtname == .jpsql || resourceExtname == .jrxml"
+        },
+        {
+          "command": "jpsql.runQuery",
+          "group": "navigation",
+          "when": "resourceExtname == .jpsql || resourceExtname == .jrxml"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "jpsql.refreshParameters",
+          "when": "view == jpsql.parametersView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "JPSQL Runner",
+      "properties": {
+        "jpsql.runnerCommand": {
+          "type": "string",
+          "default": "mssql.runQuery",
+          "description": "VS Code command invoked after opening the compiled SQL. Examples: mssql.runQuery, sqltools.executeQuery. Leave empty to only open compiled SQL."
+        },
+        "jpsql.compiledLanguageId": {
+          "type": "string",
+          "default": "sql",
+          "description": "Language id used for the compiled SQL editor."
+        },
+        "jpsql.openCompiledSqlBeside": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the compiled SQL in a beside editor before invoking the configured SQL extension command."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node test/reportSql.test.js",
+    "check": "npm run test",
+    "package": "npm run check && vsce package",
+    "publish:marketplace": "npm run check && vsce publish",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^5.8.3"
+  }
+}
