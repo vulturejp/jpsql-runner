@@ -43,18 +43,24 @@ export function discoverParameterNames(sql: string): string[] {
 
 function compileXExpression(fn: string, column: string, parameter: ReportParameter, inputs: QueryInput[]): string {
   const normalizedFn = fn.toUpperCase();
-  const values = arrayValue(parameter);
 
   if (normalizedFn === 'IN' || normalizedFn === 'NOTIN') {
     if (parameter.isNull) {
       return normalizedFn === 'IN' ? `${column} is null` : `${column} is not null`;
     }
 
+    const values = arrayValue(parameter);
     if (values.length === 0) {
       return normalizedFn === 'IN' ? '1 = 0' : '1 = 1';
     }
 
-    const literals = values.map((value, index) => {
+    const nonNullValues = values.filter((value) => value !== null && value !== undefined);
+    const hasNullValue = nonNullValues.length !== values.length;
+    if (nonNullValues.length === 0) {
+      return normalizedFn === 'IN' ? `${column} is null` : `${column} is not null`;
+    }
+
+    const literals = nonNullValues.map((value, index) => {
       inputs.push({
         name: `${parameter.name}[${index}]`,
         value,
@@ -62,10 +68,22 @@ function compileXExpression(fn: string, column: string, parameter: ReportParamet
       });
       return literalFromUnknown(value);
     });
-    return `${column} ${normalizedFn === 'IN' ? 'in' : 'not in'} (${literals.join(', ')})`;
+
+    const collectionSql = `${column} ${normalizedFn === 'IN' ? 'in' : 'not in'} (${literals.join(', ')})`;
+    if (!hasNullValue) {
+      return collectionSql;
+    }
+
+    return normalizedFn === 'IN'
+      ? `(${collectionSql} or ${column} is null)`
+      : `(${collectionSql} and ${column} is not null)`;
   }
 
   if (normalizedFn === 'EQUAL' || normalizedFn === 'NOTEQUAL') {
+    if (parameter.type === 'Array') {
+      throw new Error(`$X{${normalizedFn}, ...} does not support Array parameter "${parameter.name}". Use IN or NOTIN.`);
+    }
+
     if (parameter.isNull) {
       return `${column} is ${normalizedFn === 'EQUAL' ? '' : 'not '}null`;
     }
@@ -95,7 +113,7 @@ function sqlLiteral(parameter: ReportParameter): string {
     case 'DateTime':
       return `N'${escapeSqlString(formatDateLiteral(typedValue(parameter)))}'`;
     case 'Array':
-      return arrayValue(parameter).map(literalFromUnknown).join(', ');
+      return arrayValue(parameter).map(literalFromUnknown).join(', ') || 'null';
     case 'Raw':
       return rawValue(parameter);
     case 'String':
@@ -188,13 +206,77 @@ function arrayValue(parameter: ReportParameter): unknown[] {
     return [];
   }
 
-  if (trimmed.startsWith('[')) {
-    const parsed = JSON.parse(trimmed);
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      throw new Error(`Parameter "${parameter.name}" must be a valid JSON array.`);
+    }
     if (!Array.isArray(parsed)) {
       throw new Error(`Parameter "${parameter.name}" must be a JSON array.`);
     }
     return parsed;
   }
 
-  return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+  return parseCsvArray(parameter.name, trimmed);
+}
+
+function parseCsvArray(parameterName: string, value: string): string[] {
+  const items: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | undefined;
+  let fieldWasQuoted = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+
+    if (quote) {
+      if (character === quote) {
+        const next = value[index + 1];
+        if (next === quote) {
+          current += quote;
+          index += 1;
+        } else {
+          quote = undefined;
+        }
+      } else if (character === '\\' && value[index + 1]) {
+        current += value[index + 1];
+        index += 1;
+      } else {
+        current += character;
+      }
+      continue;
+    }
+
+    if ((character === '"' || character === "'") && current.trim() === '') {
+      quote = character;
+      fieldWasQuoted = true;
+      current = '';
+      continue;
+    }
+
+    if (character === ',') {
+      pushCsvItem(items, current, fieldWasQuoted);
+      current = '';
+      fieldWasQuoted = false;
+      continue;
+    }
+
+    current += character;
+  }
+
+  if (quote) {
+    throw new Error(`Parameter "${parameterName}" has an unterminated quoted CSV item.`);
+  }
+
+  pushCsvItem(items, current, fieldWasQuoted);
+  return items;
+}
+
+function pushCsvItem(items: string[], value: string, fieldWasQuoted: boolean): void {
+  const item = fieldWasQuoted ? value.trimEnd() : value.trim();
+  if (item !== '') {
+    items.push(item);
+  }
 }

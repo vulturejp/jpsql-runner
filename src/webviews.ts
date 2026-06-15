@@ -161,7 +161,7 @@ function parametersHtml(
             <td><input data-field="name" value="\${escapeAttr(parameter.name)}" placeholder="CustomerId"></td>
             <td><select data-field="type">\${types.map(type => \`<option value="\${type}" \${parameter.type === type ? 'selected' : ''}>\${type}</option>\`).join('')}</select></td>
             <td class="null-cell"><input type="checkbox" data-field="isNull" aria-label="Null" \${parameter.isNull ? 'checked' : ''}></td>
-            <td><textarea data-field="value" rows="1" placeholder="値、CSV、または JSON 配列">\${escapeText(parameter.value ?? '')}</textarea></td>
+            <td><textarea data-field="value" rows="1" placeholder="Value, CSV, or JSON array">\${escapeText(parameter.value ?? '')}</textarea></td>
             <td class="remove-cell"><button class="remove" data-remove title="Remove">Remove</button></td>
           \`;
           row.querySelectorAll('[data-field]').forEach(input => {

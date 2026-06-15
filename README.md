@@ -112,6 +112,23 @@ where Status in (N'A', N'B')
 
 Array values can be JSON arrays or comma-separated text. Empty `IN` arrays compile to `1 = 0`; empty `NOTIN` arrays compile to `1 = 1`.
 
+JSON arrays preserve item types, so numbers, booleans, strings, and `null` values are compiled as SQL literals:
+
+```text
+[1, 2, 3]
+["A", null, "B"]
+[true, false]
+```
+
+Comma-separated text is also supported for quick string lists. Quote an item when it contains a comma:
+
+```text
+A, B, C
+"A,B", C, 'D''E'
+```
+
+When an `IN` collection contains `null`, JPSQL Runner adds an `or column is null` condition. `NOTIN` collections containing `null` add `and column is not null`. For empty collections, prefer `$X{IN, column, name}` or `$X{NOTIN, column, name}` over `column in ($P{name})` because `$X{}` can produce safe always-false or always-true SQL.
+
 ## Development
 
 ```sh

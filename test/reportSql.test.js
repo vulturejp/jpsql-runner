@@ -52,4 +52,95 @@ assert.equal(
   'where 1 = 1'
 );
 
+assert.equal(
+  compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: 'A, B, C', isNull: false }
+  ]).sql,
+  "where Status in (N'A', N'B', N'C')"
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '"A,B", C, \'D\'\'E\'', isNull: false }
+  ]).sql,
+  "where Status in (N'A,B', N'C', N'D''E')"
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, Id, Ids}', [
+    { name: 'Ids', type: 'Array', value: '[1, 2, 3]', isNull: false }
+  ]).sql,
+  'where Id in (1, 2, 3)'
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, IsActive, Flags}', [
+    { name: 'Flags', type: 'Array', value: '[true, false]', isNull: false }
+  ]).sql,
+  'where IsActive in (1, 0)'
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '["A", null, "B"]', isNull: false }
+  ]).sql,
+  "where (Status in (N'A', N'B') or Status is null)"
+);
+
+assert.equal(
+  compileReportSql('where $X{NOTIN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '["A", null]', isNull: false }
+  ]).sql,
+  "where (Status not in (N'A') and Status is not null)"
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '[null]', isNull: false }
+  ]).sql,
+  'where Status is null'
+);
+
+assert.equal(
+  compileReportSql('where Status in ($P{Statuses})', [
+    { name: 'Statuses', type: 'Array', value: '["A", "B"]', isNull: false }
+  ]).sql,
+  "where Status in (N'A', N'B')"
+);
+
+assert.equal(
+  compileReportSql('where Status in ($P{Statuses})', [
+    { name: 'Statuses', type: 'Array', value: '', isNull: false }
+  ]).sql,
+  'where Status in (null)'
+);
+
+assert.throws(
+  () => compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '[1,', isNull: false }
+  ]),
+  /Parameter "Statuses" must be a valid JSON array\./
+);
+
+assert.throws(
+  () => compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '{"A": true}', isNull: false }
+  ]),
+  /Parameter "Statuses" must be a JSON array\./
+);
+
+assert.throws(
+  () => compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '"A', isNull: false }
+  ]),
+  /Parameter "Statuses" has an unterminated quoted CSV item\./
+);
+
+assert.throws(
+  () => compileReportSql('where $X{EQUAL, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '["A"]', isNull: false }
+  ]),
+  /\$X\{EQUAL, \.\.\.\} does not support Array parameter "Statuses"\./
+);
+
 console.log('reportSql tests passed');
