@@ -39,6 +39,41 @@ assert.deepEqual(
 );
 
 assert.equal(
+  compileReportSql('where Name = $P{Name}', [
+    { name: 'Name', type: 'String', value: '"Alice"', isNull: false }
+  ]).sql,
+  "where Name = N'Alice'"
+);
+
+assert.deepEqual(
+  compileReportSql('where Name = $P{Name}', [
+    { name: 'Name', type: 'String', value: '"A\\"B\\\\C"', isNull: false }
+  ]).inputs[0].value,
+  'A"B\\C'
+);
+
+assert.equal(
+  compileReportSql('where CreatedAt >= $P{FromDate}', [
+    { name: 'FromDate', type: 'Date', value: '"2024-01-02"', isNull: false }
+  ]).sql,
+  "where CreatedAt >= N'2024-01-02T00:00:00.000Z'"
+);
+
+assert.equal(
+  compileReportSql('where Id = $P{Id}', [
+    { name: 'Id', type: 'Number', value: '"42"', isNull: false }
+  ]).sql,
+  'where Id = 42'
+);
+
+assert.equal(
+  compileReportSql('where IsActive = $P{Flag}', [
+    { name: 'Flag', type: 'Boolean', value: '"true"', isNull: false }
+  ]).sql,
+  'where IsActive = 1'
+);
+
+assert.equal(
   compileReportSql('where $X{IN, Status, EmptyList}', [
     { name: 'EmptyList', type: 'Array', value: '', isNull: false }
   ]).sql,
@@ -64,6 +99,20 @@ assert.equal(
     { name: 'Statuses', type: 'Array', value: '"A,B", C, \'D\'\'E\'', isNull: false }
   ]).sql,
   "where Status in (N'A,B', N'C', N'D''E')"
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '"A","B","C"', isNull: false }
+  ]).sql,
+  "where Status in (N'A', N'B', N'C')"
+);
+
+assert.equal(
+  compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '"A\\"B", "C\\\\D"', isNull: false }
+  ]).sql,
+  "where Status in (N'A\"B', N'C\\D')"
 );
 
 assert.equal(
@@ -134,6 +183,20 @@ assert.throws(
     { name: 'Statuses', type: 'Array', value: '"A', isNull: false }
   ]),
   /Parameter "Statuses" has an unterminated quoted CSV item\./
+);
+
+assert.throws(
+  () => compileReportSql('where Name = $P{Name}', [
+    { name: 'Name', type: 'String', value: '"Alice', isNull: false }
+  ]),
+  /Parameter "Name" has an unterminated quoted string\./
+);
+
+assert.throws(
+  () => compileReportSql('where $X{IN, Status, Statuses}', [
+    { name: 'Statuses', type: 'Array', value: '"A" extra, "B"', isNull: false }
+  ]),
+  /Parameter "Statuses" has unexpected text after a quoted CSV item\./
 );
 
 assert.throws(

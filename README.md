@@ -86,6 +86,17 @@ where CustomerId = $P{CustomerId}
 
 Raw parameters use `$P!{name}` and are inserted directly into the generated SQL. Use raw parameters only for trusted values such as column names, `order by` clauses, or known SQL fragments.
 
+String-like parameter values may be entered either as plain text or as quoted expression-style text:
+
+```text
+ABC
+"ABC"
+"A\"B"
+"A\nB"
+```
+
+For `String`, `Number`, `Boolean`, `Date`, and `DateTime` parameters, a surrounding double-quoted string is parsed before SQL compilation. Raw parameters are not unquoted because they are treated as SQL fragments.
+
 ## Collection Parameters
 
 ```sql
@@ -124,6 +135,7 @@ Comma-separated text is also supported for quick string lists. Quote an item whe
 
 ```text
 A, B, C
+"A","B","C"
 "A,B", C, 'D''E'
 ```
 

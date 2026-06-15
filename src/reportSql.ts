@@ -118,7 +118,7 @@ function sqlLiteral(parameter: ReportParameter): string {
       return rawValue(parameter);
     case 'String':
     default:
-      return `N'${escapeSqlString(parameter.value)}'`;
+      return `N'${escapeSqlString(scalarText(parameter))}'`;
   }
 }
 
@@ -171,17 +171,17 @@ function typedValue(parameter: ReportParameter): unknown {
 
   switch (parameter.type) {
     case 'Number': {
-      const parsed = Number(parameter.value);
+      const parsed = Number(scalarText(parameter));
       if (Number.isNaN(parsed)) {
         throw new Error(`Parameter "${parameter.name}" is not a valid number.`);
       }
       return parsed;
     }
     case 'Boolean':
-      return ['true', '1', 'yes', 'on'].includes(parameter.value.trim().toLowerCase());
+      return ['true', '1', 'yes', 'on'].includes(scalarText(parameter).trim().toLowerCase());
     case 'Date':
     case 'DateTime': {
-      const date = new Date(parameter.value);
+      const date = new Date(scalarText(parameter));
       if (Number.isNaN(date.getTime())) {
         throw new Error(`Parameter "${parameter.name}" is not a valid date.`);
       }
@@ -192,8 +192,12 @@ function typedValue(parameter: ReportParameter): unknown {
     case 'Raw':
     case 'String':
     default:
-      return parameter.value;
+      return scalarText(parameter);
   }
+}
+
+function scalarText(parameter: ReportParameter): string {
+  return parseMaybeQuotedString(parameter.name, parameter.value);
 }
 
 function arrayValue(parameter: ReportParameter): unknown[] {
@@ -227,6 +231,7 @@ function parseCsvArray(parameterName: string, value: string): string[] {
   let current = '';
   let quote: '"' | "'" | undefined;
   let fieldWasQuoted = false;
+  let afterQuotedField = false;
 
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
@@ -239,9 +244,10 @@ function parseCsvArray(parameterName: string, value: string): string[] {
           index += 1;
         } else {
           quote = undefined;
+          afterQuotedField = true;
         }
       } else if (character === '\\' && value[index + 1]) {
-        current += value[index + 1];
+        current += unescapeCharacter(value[index + 1]);
         index += 1;
       } else {
         current += character;
@@ -249,10 +255,15 @@ function parseCsvArray(parameterName: string, value: string): string[] {
       continue;
     }
 
+    if (afterQuotedField && character !== ',' && !/\s/.test(character)) {
+      throw new Error(`Parameter "${parameterName}" has unexpected text after a quoted CSV item.`);
+    }
+
     if ((character === '"' || character === "'") && current.trim() === '') {
       quote = character;
       fieldWasQuoted = true;
       current = '';
+      afterQuotedField = false;
       continue;
     }
 
@@ -260,6 +271,7 @@ function parseCsvArray(parameterName: string, value: string): string[] {
       pushCsvItem(items, current, fieldWasQuoted);
       current = '';
       fieldWasQuoted = false;
+      afterQuotedField = false;
       continue;
     }
 
@@ -278,5 +290,60 @@ function pushCsvItem(items: string[], value: string, fieldWasQuoted: boolean): v
   const item = fieldWasQuoted ? value.trimEnd() : value.trim();
   if (item !== '') {
     items.push(item);
+  }
+}
+
+function parseMaybeQuotedString(parameterName: string, value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('"')) {
+    return value;
+  }
+
+  const parsed = parseQuotedString(parameterName, trimmed);
+  if (parsed.endIndex !== trimmed.length) {
+    const rest = trimmed.slice(parsed.endIndex).trim();
+    if (rest) {
+      throw new Error(`Parameter "${parameterName}" has unexpected text after a quoted string.`);
+    }
+  }
+  return parsed.value;
+}
+
+function parseQuotedString(parameterName: string, value: string): { value: string; endIndex: number } {
+  let result = '';
+
+  for (let index = 1; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === '"') {
+      return { value: result, endIndex: index + 1 };
+    }
+    if (character === '\\') {
+      if (index + 1 >= value.length) {
+        throw new Error(`Parameter "${parameterName}" has an unterminated escape sequence.`);
+      }
+      result += unescapeCharacter(value[index + 1]);
+      index += 1;
+      continue;
+    }
+    result += character;
+  }
+
+  throw new Error(`Parameter "${parameterName}" has an unterminated quoted string.`);
+}
+
+function unescapeCharacter(character: string): string {
+  switch (character) {
+    case 'n':
+      return '\n';
+    case 'r':
+      return '\r';
+    case 't':
+      return '\t';
+    case 'b':
+      return '\b';
+    case 'f':
+      return '\f';
+    default:
+      return character;
   }
 }
